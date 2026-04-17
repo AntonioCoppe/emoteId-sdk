@@ -67,7 +67,12 @@ jobs:
 
       - name: Publish to npm
         if: steps.published.outputs.exists != 'true'
-        run: npm publish --access public --provenance
+        run: |
+          if node -e "process.exit(require('./package.json').version.includes('hackathon') ? 0 : 1)"; then
+            npm publish --access public --tag hackathon --provenance
+          else
+            npm publish --access public --provenance
+          fi
 
       - name: Skip duplicate publish
         if: steps.published.outputs.exists == 'true'

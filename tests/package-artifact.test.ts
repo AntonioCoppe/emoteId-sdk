@@ -11,10 +11,18 @@ describe("package artifact shape", () => {
       bugs?: { url?: string };
     };
 
-    expect(packageJson.version).toBe("0.1.2");
+    expect(packageJson.version).toBe("0.2.0-hackathon.0");
     expect(packageJson.repository?.url).toContain("AntonioCoppe/emoteId-sdk");
     expect(packageJson.homepage).toContain("AntonioCoppe/emoteId-sdk");
     expect(packageJson.bugs?.url).toContain("AntonioCoppe/emoteId-sdk/issues");
+  });
+
+  it("documents captureSummaryProvider in the public README", () => {
+    const readme = readFileSync(join(process.cwd(), "README.md"), "utf8");
+
+    expect(readme).toContain("captureSummaryProvider");
+    expect(readme).toContain("patternCode: 1");
+    expect(readme).toContain("providerSessionId");
   });
 
   it("keeps the built ESM entrypoint on explicit .js imports", () => {

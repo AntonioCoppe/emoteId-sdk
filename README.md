@@ -77,6 +77,30 @@ export function VerifyButton({
 }
 ```
 
+## `captureSummaryProvider` Example
+
+```ts
+const result = await verifyAndAttest(userWallet, {
+  issuerBaseUrl: "https://your-issuer.example.com",
+  attestationKind: "session-pass",
+  walletClient,
+  captureSummaryProvider: async ({ sessionId, providerSessionId }) => ({
+    durationSeconds: 14,
+    framesProcessed: 420,
+    liveness: 0.93,
+    bodyPose: 0.84,
+    patternConfidence: 0.91,
+    hrv: 0.58,
+    fatigue: 0.19,
+    bpm: 72,
+    patternCode: 1,
+    gestureCode: 1,
+  }),
+});
+
+console.log(result.attestationPda, sessionId, providerSessionId);
+```
+
 ## Verifying An Attestation
 
 `verifyAttestation` checks:
@@ -194,7 +218,7 @@ Recommended setup:
 - configure npm to trust the `AntonioCoppe/emoteId-sdk` repository and the `publish-npm.yml` workflow
 - publish by either:
   - creating a GitHub release
-  - pushing a tag like `v0.1.2`
+  - pushing a tag like `v0.2.0-hackathon.0`
   - running the workflow manually from the Actions tab
 
 The workflow:
@@ -204,6 +228,7 @@ The workflow:
 - builds the package
 - skips if that exact version is already on npm
 - publishes with provenance enabled
+- routes `*-hackathon.*` prereleases to the npm `hackathon` dist-tag instead of `latest`
 
 ## Repository
 
