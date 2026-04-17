@@ -186,7 +186,8 @@ Current package version:
 
 ## Repository
 
-- Monorepo: [github.com/emoteai/emoteid](https://github.com/emoteai/emoteid)
+- Source: [github.com/AntonioCoppe/emoteId-sdk](https://github.com/AntonioCoppe/emoteId-sdk)
+- Demo app: [github.com/AntonioCoppe/emoteId-demo](https://github.com/AntonioCoppe/emoteId-demo)
 
 ## License
 
