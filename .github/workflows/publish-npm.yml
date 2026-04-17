@@ -67,7 +67,7 @@ jobs:
 
       - name: Publish to npm
         if: steps.published.outputs.exists != 'true'
-        run: npm publish --access public
+        run: npm publish --access public --provenance
 
       - name: Skip duplicate publish
         if: steps.published.outputs.exists == 'true'
