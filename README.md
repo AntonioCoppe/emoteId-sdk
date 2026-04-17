@@ -184,6 +184,27 @@ Current package version:
 - issuer integration: expected to be hosted separately
 - mobile wallet path: depends on your wallet stack and platform
 
+## GitHub Autopublish
+
+This repo includes `.github/workflows/publish-npm.yml` for automated npm publishes from GitHub Actions.
+
+Recommended setup:
+
+- use npm trusted publishing instead of a long-lived `NPM_TOKEN`
+- configure npm to trust the `AntonioCoppe/emoteId-sdk` repository and the `publish-npm.yml` workflow
+- publish by either:
+  - creating a GitHub release
+  - pushing a tag like `v0.1.2`
+  - running the workflow manually from the Actions tab
+
+The workflow:
+
+- installs with `pnpm`
+- runs tests
+- builds the package
+- skips if that exact version is already on npm
+- publishes with provenance enabled
+
 ## Repository
 
 - Source: [github.com/AntonioCoppe/emoteId-sdk](https://github.com/AntonioCoppe/emoteId-sdk)
