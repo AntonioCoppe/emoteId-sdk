@@ -19,6 +19,8 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
     steps:
       - name: Checkout
@@ -65,7 +67,7 @@ jobs:
 
       - name: Publish to npm
         if: steps.published.outputs.exists != 'true'
-        run: npm publish --access public --provenance
+        run: npm publish --access public
 
       - name: Skip duplicate publish
         if: steps.published.outputs.exists == 'true'
