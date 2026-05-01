@@ -21,7 +21,8 @@ describe("package artifact shape", () => {
     const readme = readFileSync(join(process.cwd(), "README.md"), "utf8");
 
     expect(readme).toContain("captureSummaryProvider");
-    expect(readme).toContain("patternCode: 1");
+    expect(readme).toContain("gestureCode: 1");
+    expect(readme).toContain("verifyAndIssueTrustCredential");
     expect(readme).toContain("providerSessionId");
   });
 

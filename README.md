@@ -8,6 +8,8 @@ Thin client SDK for issuing and verifying EmoteID biometric attestations on Sola
 - signing the issuer challenge with a wallet
 - receiving a SAS attestation PDA
 - verifying the resulting attestation against wallet and policy constraints
+- starting v2 trust sessions for SAS, W3C VC, SD-JWT, and signed JSON credentials
+- binding wallet sessions to passkeys through WebAuthn assertion helpers
 
 This package is intentionally thin. It does not embed secrets, issue attestations directly from the browser, or replace your backend issuer.
 
@@ -26,6 +28,12 @@ Peer/runtime expectations:
 ## What It Exports
 
 - `verifyAndAttest(wallet, options)`
+- `verifyAndIssueTrustCredential(options)`
+- `startTrustSession(options)`
+- `completeTrustSession(started, options)`
+- `verifyTrustCredentialStatus(options)`
+- `revokeTrustCredential(options)`
+- `getPasskeyAssertion(options)`
 - `verifyAttestation(rpc, input)`
 - `useEmoteID(options)`
 - `createDemoWalletClient(seed?)`
@@ -88,12 +96,10 @@ const result = await verifyAndAttest(userWallet, {
     durationSeconds: 14,
     framesProcessed: 420,
     liveness: 0.93,
-    bodyPose: 0.84,
-    patternConfidence: 0.91,
+    gestureConfidence: 0.91,
     hrv: 0.58,
     fatigue: 0.19,
     bpm: 72,
-    patternCode: 1,
     gestureCode: 1,
   }),
 });
@@ -120,7 +126,7 @@ const verification = await verifyAttestation(rpc, {
   wallet: userWallet,
   policy: {
     minLivenessBps: 9000,
-    minBodyPoseBps: 8500,
+    minGestureConfidenceBps: 8500,
   },
 });
 
@@ -156,10 +162,9 @@ type VerifyAndAttestOptions = {
   expirySeconds?: number;
   policy?: {
     minLivenessBps?: number;
-    minBodyPoseBps?: number;
+    minGestureConfidenceBps?: number;
     maxFatigueBucket?: number;
     minHrvBucket?: number;
-    requiredPatternCode?: number;
     requiredGestureCode?: number;
   };
   controllerWallet?: string;
@@ -173,18 +178,47 @@ type VerifyAndAttestOptions = {
     durationSeconds: number;
     framesProcessed: number;
     liveness?: number;
-    bodyPose?: number;
-    patternConfidence?: number;
+    gestureConfidence?: number;
     hrv?: number;
     fatigue?: number;
     bpm?: number;
-    patternCode?: number;
     gestureCode?: number;
   } | undefined>;
 };
 ```
 
-For the current Emote-backed flow, `patternCode: 1` represents the `angry -> happy -> sad` expression sequence. The older `gestureCode` and `bodyPose` names remain as compatibility aliases for the v1 schema.
+For the current Emote-backed flow, `gestureCode: 1` represents the completed randomized challenge. The older `bodyPose`, `patternConfidence`, and `patternCode` names remain compatibility aliases for legacy v1 integrations.
+
+## Trust Fabric v2
+
+```ts
+import { getPasskeyAssertion, verifyAndIssueTrustCredential } from "@emoteai/sas-biometric";
+
+const result = await verifyAndIssueTrustCredential({
+  issuerBaseUrl: "https://your-issuer.example.com",
+  subject: {
+    type: "wallet",
+    wallet: userWallet,
+  },
+  requestedOutputs: ["sas", "w3c-vc", "sd-jwt"],
+  walletClient,
+  livenessResultProvider: async ({ started }) => {
+    // Render/stream started.emoteChallenge through Emote API, then return its signed result token.
+    return completeEmoteChallenge(started.emoteChallenge);
+  },
+  passkeyAssertionProvider: (options) => (options ? getPasskeyAssertion(options) : undefined),
+});
+
+console.log(result.assuranceLevel);
+console.log(result.credentials);
+```
+
+The v2 flow expects issuer endpoints:
+
+- `POST /api/v2/trust-sessions`
+- `POST /api/v2/trust-sessions/:id/complete`
+- `GET /api/v2/credentials/:id/status`
+- `POST /api/v2/credentials/:id/revoke`
 
 ## Security Notes
 
