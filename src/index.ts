@@ -40,6 +40,10 @@ export interface PasskeyAssertion {
   signatureBase64: string;
   clientDataJSON?: string;
   authenticatorData?: string;
+  credentialPublicKeyPem?: string;
+  credentialPublicKeyJwk?: JsonWebKey;
+  origin?: string;
+  signCount?: number;
 }
 
 export interface EmoteChallengeStep {
@@ -266,6 +270,7 @@ export async function revokeTrustCredential(options: {
   credentialId: string;
   actor: string;
   reason: string;
+  adminToken?: string;
   fetchImpl?: typeof fetch;
 }): Promise<CredentialStatusResponse> {
   const fetchImpl = options.fetchImpl ?? fetch;
@@ -273,7 +278,10 @@ export async function revokeTrustCredential(options: {
     `${trimBaseUrl(options.issuerBaseUrl)}/api/v2/credentials/${options.credentialId}/revoke`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.adminToken ? { authorization: `Bearer ${options.adminToken}` } : {}),
+      },
       body: JSON.stringify({
         actor: options.actor,
         reason: options.reason,
@@ -488,6 +496,47 @@ export function decodeSignedCredential(token: string): { header: unknown; payloa
   return {
     header: JSON.parse(Buffer.from(parts[0], "base64url").toString("utf8")) as unknown,
     payload: JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8")) as unknown,
+    signature: parts[2],
+  };
+}
+
+export interface LivenessResultTokenClaims {
+  iss?: string;
+  aud?: string | string[];
+  jti?: string;
+  iat?: number;
+  nbf?: number;
+  exp?: number;
+  liveId?: string;
+  sessionId?: string;
+  clientId?: string;
+  biometricUuid?: string;
+  challengeHash?: string;
+  status?: "passed" | "failed" | string;
+  scores?: Record<string, unknown>;
+  stepResults?: readonly unknown[];
+  spoofRiskScore?: number;
+  engineVersion?: string;
+}
+
+export function decodeLivenessResultToken(token: string): {
+  header: { alg?: string; typ?: string; kid?: string };
+  claims: LivenessResultTokenClaims;
+  signature: string;
+} {
+  const parts = token.split(".");
+
+  if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) {
+    throw new Error("Invalid liveness result token");
+  }
+
+  return {
+    header: JSON.parse(Buffer.from(parts[0], "base64url").toString("utf8")) as {
+      alg?: string;
+      typ?: string;
+      kid?: string;
+    },
+    claims: JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8")) as LivenessResultTokenClaims,
     signature: parts[2],
   };
 }

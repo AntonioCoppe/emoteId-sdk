@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import nacl from "tweetnacl";
 import {
   createDemoWalletClient,
+  decodeLivenessResultToken,
+  revokeTrustCredential,
   verifyAndAttest,
   verifyAndIssueTrustCredential,
   verifyTrustCredentialStatus,
@@ -115,6 +117,10 @@ describe("@emoteai/sas-biometric", () => {
         credentialId: "passkey-test",
         challenge: options!.challenge,
         signatureBase64: "passkey-signature",
+        clientDataJSON: Buffer.from(JSON.stringify({ type: "webauthn.get", challenge: options!.challenge })).toString(
+          "base64url",
+        ),
+        authenticatorData: Buffer.from("authenticator-data").toString("base64url"),
       }),
     });
 
@@ -144,5 +150,69 @@ describe("@emoteai/sas-biometric", () => {
       credentialId: "cred-123",
       status: "active",
     });
+  });
+
+  it("decodes deployed Emote liveness result token claims", () => {
+    const header = Buffer.from(JSON.stringify({ alg: "ES256", typ: "JWT", kid: "emote-liveness-prod" })).toString(
+      "base64url",
+    );
+    const payload = Buffer.from(
+      JSON.stringify({
+        iss: "https://api.emote.ai",
+        aud: "emoteid",
+        sessionId: "trust-session-123",
+        challengeHash: "sha256:challenge",
+        status: "passed",
+        scores: {
+          overall: 94,
+          gesture: 91,
+          expression: 87,
+          blinkHold: 100,
+          dotTracking: 89,
+        },
+        spoofRiskScore: 0.06,
+      }),
+    ).toString("base64url");
+
+    expect(decodeLivenessResultToken(`${header}.${payload}.signature`)).toMatchObject({
+      header: { kid: "emote-liveness-prod" },
+      claims: {
+        iss: "https://api.emote.ai",
+        aud: "emoteid",
+        sessionId: "trust-session-123",
+        status: "passed",
+      },
+    });
+  });
+
+  it("sends admin authorization when revoking a trust credential", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
+      Response.json({
+        credentialId: "cred-123",
+        status: "revoked",
+        reason: "customer_request",
+      }),
+    );
+
+    await expect(
+      revokeTrustCredential({
+        issuerBaseUrl: "https://example.test",
+        credentialId: "cred-123",
+        actor: "admin:test",
+        reason: "customer_request",
+        adminToken: "admin-secret",
+        fetchImpl: fetchMock,
+      }),
+    ).resolves.toMatchObject({
+      credentialId: "cred-123",
+      status: "revoked",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://example.test/api/v2/credentials/cred-123/revoke",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({ authorization: "Bearer admin-secret" }),
+      }),
+    );
   });
 });
