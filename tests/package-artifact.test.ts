@@ -11,7 +11,7 @@ describe("package artifact shape", () => {
       bugs?: { url?: string };
     };
 
-    expect(packageJson.version).toBe("0.2.0-hackathon.0");
+    expect(packageJson.version).toBe("0.2.0-hackathon.1");
     expect(packageJson.repository?.url).toContain("AntonioCoppe/emoteId-sdk");
     expect(packageJson.homepage).toContain("AntonioCoppe/emoteId-sdk");
     expect(packageJson.bugs?.url).toContain("AntonioCoppe/emoteId-sdk/issues");

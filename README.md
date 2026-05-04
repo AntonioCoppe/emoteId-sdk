@@ -1,12 +1,13 @@
 # `@emoteai/sas-biometric`
 
-Thin client SDK for issuing and verifying EmoteID biometric attestations on Solana.
+Client SDK for issuing and verifying EmoteID SAS attestations and Trust Fabric credentials.
 
-`@emoteai/sas-biometric` is the public integration layer for EmoteID. It gives dApps, wallets, agents, and trading flows a small client surface for:
+`@emoteai/sas-biometric` is the public integration layer for EmoteID. It gives dApps, wallets, agents, and institutional verifier flows a small client surface for:
 
 - starting a biometric verification session against an issuer
 - signing the issuer challenge with a wallet
 - receiving a SAS attestation PDA
+- completing signed api.emote.ai liveness evidence flows
 - verifying the resulting attestation against wallet and policy constraints
 - starting v2 trust sessions for SAS, W3C VC, SD-JWT, and signed JSON credentials
 - binding wallet sessions to passkeys through WebAuthn assertion helpers
@@ -238,7 +239,8 @@ The v2 flow expects issuer endpoints:
 
 Current package version:
 
-- browser/client SDK: production-shaped
+- browser/client SDK: production-shaped v2 prerelease
+- package: `0.2.0-hackathon.1`
 - issuer integration: expected to be hosted separately
 - mobile wallet path: depends on your wallet stack and platform
 
@@ -252,7 +254,7 @@ Recommended setup:
 - configure npm to trust the `AntonioCoppe/emoteId-sdk` repository and the `publish-npm.yml` workflow
 - publish by either:
   - creating a GitHub release
-  - pushing a tag like `v0.2.0-hackathon.0`
+  - pushing a tag like `v0.2.0-hackathon.1`
   - running the workflow manually from the Actions tab
 
 The workflow:
