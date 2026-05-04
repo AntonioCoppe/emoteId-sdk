@@ -197,11 +197,10 @@ export async function completeTrustSession(
   },
 ): Promise<CompleteTrustSessionResponse> {
   const fetchImpl = options.fetchImpl ?? fetch;
+  const walletChallengeBytes = getWalletChallengeBytes(started);
   const walletSignatureBase64 =
-    started.walletChallengeBase64 && options.walletClient
-      ? Buffer.from(
-          await options.walletClient.signMessage(Uint8Array.from(Buffer.from(started.walletChallengeBase64, "base64"))),
-        ).toString("base64")
+    walletChallengeBytes && options.walletClient
+      ? bytesToBase64(await options.walletClient.signMessage(walletChallengeBytes))
       : undefined;
   const response = await fetchImpl(
     `${trimBaseUrl(options.issuerBaseUrl)}/api/v2/trust-sessions/${started.trustSessionId}/complete`,
@@ -545,15 +544,50 @@ function trimBaseUrl(value: string): string {
   return value.replace(/\/+$/, "");
 }
 
+function getWalletChallengeBytes(started: StartTrustSessionResponse): Uint8Array | undefined {
+  if (started.walletChallengeBase64) {
+    return base64ToBytes(started.walletChallengeBase64);
+  }
+
+  if (started.walletChallenge) {
+    return new TextEncoder().encode(started.walletChallenge);
+  }
+
+  return undefined;
+}
+
 function base64UrlToArrayBuffer(value: string): ArrayBuffer {
-  const bytes = Uint8Array.from(Buffer.from(value, "base64url"));
+  const bytes = base64ToBytes(value.replace(/-/g, "+").replace(/_/g, "/"));
   const output = new ArrayBuffer(bytes.byteLength);
   new Uint8Array(output).set(bytes);
   return output;
 }
 
 function arrayBufferToBase64(value: ArrayBuffer): string {
-  return Buffer.from(value).toString("base64");
+  return bytesToBase64(new Uint8Array(value));
+}
+
+function base64ToBytes(value: string): Uint8Array {
+  const padded = value.padEnd(Math.ceil(value.length / 4) * 4, "=");
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return bytes;
+}
+
+function bytesToBase64(value: Uint8Array): string {
+  const chunkSize = 0x8000;
+  let binary = "";
+
+  for (let offset = 0; offset < value.length; offset += chunkSize) {
+    binary += String.fromCharCode(...value.subarray(offset, offset + chunkSize));
+  }
+
+  return btoa(binary);
 }
 
 export function createDemoWalletClient(seed?: Uint8Array): { wallet: string; client: WalletMessageSigner; keypair: Keypair } {

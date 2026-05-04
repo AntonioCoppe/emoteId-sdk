@@ -1,13 +1,24 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import nacl from "tweetnacl";
 import {
+  completeTrustSession,
   createDemoWalletClient,
   decodeLivenessResultToken,
+  getPasskeyAssertion,
   revokeTrustCredential,
   verifyAndAttest,
   verifyAndIssueTrustCredential,
   verifyTrustCredentialStatus,
 } from "../src/index";
+import {
+  defaultVerificationPolicy,
+  evaluateThresholds,
+  fromSasBiometricAttestationData,
+} from "../src/schema";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("@emoteai/sas-biometric", () => {
   it("creates a demo wallet client that signs messages", async () => {
@@ -149,6 +160,143 @@ describe("@emoteai/sas-biometric", () => {
     ).resolves.toEqual({
       credentialId: "cred-123",
       status: "active",
+    });
+  });
+
+  it("preserves legacy body-pose thresholds separately from gesture confidence", () => {
+    const payload = {
+      subjectWallet: "11111111111111111111111111111111",
+      livenessBps: 9_500,
+      gestureConfidenceBps: 9_000,
+      bodyPoseBps: 1_000,
+      hrvBucket: 3,
+      fatigueBucket: 1,
+      gestureCode: 1,
+      sessionHash: new Uint8Array(32),
+      verifiedAt: 1n,
+      attestationKind: "session-pass" as const,
+      sessionExpiresAt: 2n,
+      maxX402Calls: 1_000,
+      controllerWallet: "11111111111111111111111111111111",
+    };
+
+    expect(
+      evaluateThresholds(payload, {
+        ...defaultVerificationPolicy,
+        minGestureConfidenceBps: 8_000,
+        minBodyPoseBps: 8_000,
+      }),
+    ).toMatchObject({
+      ok: false,
+      reasons: expect.arrayContaining(["body_pose_below_threshold"]),
+    });
+    expect(
+      fromSasBiometricAttestationData({
+        subject_wallet: payload.subjectWallet,
+        liveness_bps: payload.livenessBps,
+        gesture_confidence_bps: payload.gestureConfidenceBps,
+        body_pose_bps: payload.bodyPoseBps,
+        hrv_bucket: payload.hrvBucket,
+        fatigue_bucket: payload.fatigueBucket,
+        gesture_code: payload.gestureCode,
+        session_hash: payload.sessionHash,
+        verified_at: payload.verifiedAt,
+        attestation_kind: 1,
+        session_expires_at: payload.sessionExpiresAt,
+        max_x402_calls: payload.maxX402Calls,
+        controller_wallet: payload.controllerWallet,
+      }).bodyPoseBps,
+    ).toBe(1_000);
+  });
+
+  it("signs the plain wallet challenge when base64 challenge compatibility field is absent", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
+      Response.json({
+        approved: true,
+        reasons: [],
+        assuranceLevel: "EID-3",
+        trustScoreBps: 9_300,
+        riskScoreBps: 700,
+        credentials: [],
+      }),
+    );
+    const signedMessages: string[] = [];
+
+    await completeTrustSession(
+      {
+        trustSessionId: "trust-session-plain",
+        subjectHash: "sha256:subject",
+        walletChallenge: "plain trust challenge",
+        emoteChallenge: {
+          provider: "emote-api",
+          challengeId: "challenge-123",
+          challengeHash: "sha256:challenge",
+          expiresAt: Date.now() + 60_000,
+          steps: [],
+        },
+        expiresAt: Date.now() + 60_000,
+        policy: {},
+      },
+      {
+        issuerBaseUrl: "https://example.test",
+        wallet: "11111111111111111111111111111111",
+        walletClient: {
+          async signMessage(message) {
+            signedMessages.push(new TextDecoder().decode(message));
+            return message;
+          },
+        },
+        livenessResultToken: "token",
+        fetchImpl: fetchMock,
+      },
+    );
+
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const body = JSON.parse(String(request.body)) as { walletSignatureBase64?: string };
+    expect(signedMessages).toEqual(["plain trust challenge"]);
+    expect(Buffer.from(body.walletSignatureBase64 ?? "", "base64").toString("utf8")).toBe("plain trust challenge");
+  });
+
+  it("returns serialized WebAuthn assertion fields from the browser passkey helper", async () => {
+    const clientDataJSON = new TextEncoder().encode(
+      JSON.stringify({
+        type: "webauthn.get",
+        challenge: "challenge",
+        origin: "https://example.test",
+      }),
+    );
+    const authenticatorData = new Uint8Array([1, 2, 3, 4]);
+    const signature = new Uint8Array([5, 6, 7, 8]);
+    const get = vi.fn().mockResolvedValue({
+      id: "credential-id",
+      response: {
+        signature: signature.buffer,
+        clientDataJSON: clientDataJSON.buffer,
+        authenticatorData: authenticatorData.buffer,
+      },
+    });
+    vi.stubGlobal("navigator", { credentials: { get } });
+    vi.stubGlobal("Buffer", undefined);
+
+    await expect(
+      getPasskeyAssertion({
+        challenge: "Y2hhbGxlbmdl",
+        rpId: "example.test",
+        userVerification: "preferred",
+        timeoutMs: 60_000,
+      }),
+    ).resolves.toMatchObject({
+      credentialId: "credential-id",
+      signatureBase64: "BQYHCA==",
+      clientDataJSON: btoa(String.fromCharCode(...clientDataJSON)),
+      authenticatorData: "AQIDBA==",
+    });
+    expect(get).toHaveBeenCalledWith({
+      publicKey: expect.objectContaining({
+        rpId: "example.test",
+        userVerification: "preferred",
+        timeout: 60_000,
+      }),
     });
   });
 

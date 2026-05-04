@@ -78,10 +78,15 @@ export function evaluateThresholds(
     reasons.push("liveness_below_threshold");
   }
 
-  const minGestureConfidenceBps = policy.minGestureConfidenceBps ?? policy.minBodyPoseBps ?? 0;
-
-  if (payload.gestureConfidenceBps < minGestureConfidenceBps) {
+  if (
+    policy.minGestureConfidenceBps !== undefined &&
+    payload.gestureConfidenceBps < policy.minGestureConfidenceBps
+  ) {
     reasons.push("gesture_confidence_below_threshold");
+  }
+
+  if (policy.minBodyPoseBps !== undefined && (payload.bodyPoseBps ?? 0) < policy.minBodyPoseBps) {
+    reasons.push("body_pose_below_threshold");
   }
 
   if (payload.fatigueBucket > policy.maxFatigueBucket) {
@@ -170,7 +175,7 @@ export function fromSasBiometricAttestationData(data: SasBiometricAttestationDat
     subjectWallet: data.subject_wallet,
     livenessBps: data.liveness_bps,
     gestureConfidenceBps: data.gesture_confidence_bps ?? data.body_pose_bps ?? 0,
-    bodyPoseBps: data.gesture_confidence_bps ?? data.body_pose_bps ?? 0,
+    bodyPoseBps: data.body_pose_bps ?? data.gesture_confidence_bps ?? 0,
     hrvBucket: data.hrv_bucket,
     fatigueBucket: data.fatigue_bucket,
     gestureCode: data.gesture_code,
